@@ -164,17 +164,23 @@ static void play_next_track(void)
 
       // Sync g_loading_track with metadata_updated
       pthread_mutex_lock(&g_loading_mutex);
-
-      if (g_loading_track) {
-        sp_track_release(g_loading_track);
-      }
-
-      g_loading_track = sp_link_as_track(link);
-      sp_track_add_ref(g_loading_track);
-
+      if (g_loading_track) sp_track_release(g_loading_track);
       pthread_mutex_unlock(&g_loading_mutex);
 
+      sp_track *t = sp_link_as_track(link);
+      sp_track_add_ref(t);
       sp_link_release(link);
+
+      // If track is loaded, play immediately; otherwise wait for
+      // metadata_updated to notify us
+      if (sp_track_is_loaded(t)) {
+        play_track(t);
+      } else {
+        // Sync g_loading_track with metadata_updated
+        pthread_mutex_lock(&g_loading_mutex);
+        g_loading_track = t;
+        pthread_mutex_unlock(&g_loading_mutex);
+      }
     } else {
       printf("Search: \"%s\"\n", query);
       sp_search_create(g_sess, query, 0, 1, 0, 0, 0, 0, &search_complete, NULL);
