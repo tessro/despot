@@ -20,6 +20,8 @@ extern const uint8_t g_appkey[];
 /// The output queue for audio data
 static audio_fifo_t g_audiofifo;
 
+/// Synchronization mutex for song loading
+static pthread_mutex_t g_loading_mutex;
 /// Synchronization mutex for the main thread
 static pthread_mutex_t g_notify_mutex;
 /// Synchronization condition variable for the main thread
@@ -160,12 +162,19 @@ static void play_next_track(void)
 
     if (link && SP_LINKTYPE_TRACK == sp_link_type(link)) {
       printf("Link: \"%s\"\n", query);
+
+      // Sync g_loading_track with metadata_updated
+      pthread_mutex_lock(&g_loading_mutex);
+
       if (g_loading_track) {
         sp_track_release(g_loading_track);
       }
 
       g_loading_track = sp_link_as_track(link);
       sp_track_add_ref(g_loading_track);
+
+      pthread_mutex_unlock(&g_loading_mutex);
+
       sp_link_release(link);
     } else {
       printf("Search: \"%s\"\n", query);
@@ -208,10 +217,15 @@ static void logged_in(sp_session *sp, sp_error error)
 
 static void metadata_updated(sp_session *session)
 {
+  // Sync g_loading_track with play_next_track
+  pthread_mutex_lock(&g_loading_mutex);
+
   if (g_loading_track && sp_track_is_loaded(g_loading_track)) {
     play_track(g_loading_track);
     g_loading_track = NULL;
   }
+
+  pthread_mutex_unlock(&g_loading_mutex);
 }
 
 static int music_delivery(sp_session *sess, const sp_audioformat *format,
@@ -380,6 +394,7 @@ int main(int argc, char **argv)
 
   g_sess = sp;
 
+  pthread_mutex_init(&g_loading_mutex, NULL);
   pthread_mutex_init(&g_notify_mutex, NULL);
   pthread_cond_init(&g_notify_cond, NULL);
 
