@@ -32,6 +32,7 @@ static int g_playback_done;
 
 static sp_session *g_sess;
 static sp_track   *g_current_track;
+static sp_track   *g_loading_track;
 static sp_search  *g_last_search;
 
 static redisContext *g_redis;
@@ -155,8 +156,21 @@ static void play_next_track(void)
     }
 
     const char *query = g_redis_last_reply->element[1]->str;
-    printf("Search: \"%s\"\n", query);
-    g_last_search = sp_search_create(g_sess, query, 0, 1, 0, 0, 0, 0, &search_complete, NULL);
+    sp_link *link = sp_link_create_from_string(query);
+
+    if (link && SP_LINKTYPE_TRACK == sp_link_type(link)) {
+      printf("Link: \"%s\"\n", query);
+      if (g_loading_track) {
+        sp_track_release(g_loading_track);
+      }
+
+      g_loading_track = sp_link_as_track(link);
+      sp_track_add_ref(g_loading_track);
+      sp_link_release(link);
+    } else {
+      printf("Search: \"%s\"\n", query);
+      g_last_search = sp_search_create(g_sess, query, 0, 1, 0, 0, 0, 0, &search_complete, NULL);
+    }
   } else {
     fprintf(stderr, "Redis error: %s (%i)\n", g_redis->errstr, g_redis->err);
 
@@ -190,6 +204,14 @@ static void logged_in(sp_session *sp, sp_error error)
   }
 
   play_next_track();
+}
+
+static void metadata_updated(sp_session *session)
+{
+  if (g_loading_track && sp_track_is_loaded(g_loading_track)) {
+    play_track(g_loading_track);
+    g_loading_track = NULL;
+  }
 }
 
 static int music_delivery(sp_session *sess, const sp_audioformat *format,
@@ -255,7 +277,7 @@ static sp_session_callbacks session_callbacks = {
   .logged_in          = &logged_in,
   .notify_main_thread = &notify_main_thread,
   .music_delivery     = &music_delivery,
-  .metadata_updated   = NULL,
+  .metadata_updated   = &metadata_updated,
   .play_token_lost    = &play_token_lost,
   .log_message        = NULL,
   .end_of_track       = &end_of_track,
