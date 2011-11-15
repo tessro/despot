@@ -35,7 +35,6 @@ static int g_playback_done;
 static sp_session *g_sess;
 static sp_track   *g_current_track;
 static sp_track   *g_loading_track;
-static sp_search  *g_last_search;
 
 static redisContext *g_redis;
 static redisReply   *g_redis_last_reply;
@@ -110,6 +109,7 @@ static void play_track(sp_track *track)
     // TODO: probably use a compromise approach
     //audio_fifo_flush(&g_audiofifo);
     sp_session_player_unload(g_sess);
+    sp_track_release(g_current_track);
   }
 
   g_current_track = track;
@@ -128,6 +128,8 @@ static void search_complete(sp_search *result, void *userdata)
 
   if (sp_search_num_tracks(result)) {
     t = sp_search_track(result, 0);
+    sp_track_add_ref(t);
+    sp_search_release(result);
 
     if (sp_track_error(t) != SP_ERROR_OK) {
       fprintf(stderr, "Error: failed loading track from results (code=%i)\n", sp_track_error(t));
@@ -137,16 +139,13 @@ static void search_complete(sp_search *result, void *userdata)
 
     play_track(t);
   } else {
+    sp_search_release(result);
     play_next_track();
   }
 }
 
 static void play_next_track(void)
 {
-  if (g_last_search) {
-    sp_search_release(g_last_search);
-  }
-
   if (g_redis_last_reply) {
     freeReplyObject(g_redis_last_reply);
   }
@@ -178,7 +177,7 @@ static void play_next_track(void)
       sp_link_release(link);
     } else {
       printf("Search: \"%s\"\n", query);
-      g_last_search = sp_search_create(g_sess, query, 0, 1, 0, 0, 0, 0, &search_complete, NULL);
+      sp_search_create(g_sess, query, 0, 1, 0, 0, 0, 0, &search_complete, NULL);
     }
   } else {
     fprintf(stderr, "Redis error: %s (%i)\n", g_redis->errstr, g_redis->err);
@@ -280,6 +279,7 @@ static void play_token_lost(sp_session *sess)
 
   if (g_current_track != NULL) {
     sp_session_player_unload(g_sess);
+    sp_track_release(g_current_track);
     g_current_track = NULL;
   }
 
