@@ -4,6 +4,9 @@ A Redis-backed Spotify jukebox, in pure C. Bring tyranny to your office stereo.
 
 ## Dependencies
 
+- Hiredis
+- libspotify (tested on v10)
+
 Despot should build on any POSIX-compliant system supported by libspotify.
 Sorry, Windows.
 
