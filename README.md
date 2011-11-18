@@ -4,6 +4,7 @@ A Redis-backed Spotify jukebox, in pure C. Bring tyranny to your office stereo.
 
 ## Dependencies
 
+- OpenAL
 - Hiredis
 - libspotify (tested on v10)
 
@@ -20,8 +21,10 @@ Licensing prohibits distributing these files with Despot, sorry.
 
 ## Install
 
-Despot probably only builds on OS X right now, but you should be able to tinker
-with the Makefile to get it to work.
+Despot has been built and tested on:
+
+- Mac OS X 10.7
+- Ubuntu 10.04 LTS
 
 ### Configuring your API key
 
