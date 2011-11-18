@@ -36,7 +36,7 @@ endif
 all: $(TARGET)
 
 clean:
-	rm -f *.o *~ $(TARGET) searchplay
+	rm -f *.o *~ $(TARGET)
 
 $(TARGET): despot.o $(AUDIO_DRIVER)-audio.o audio.o
 	$(CC) $^ $(LDFLAGS) $(LDLIBS) -o $@
