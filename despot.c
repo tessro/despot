@@ -73,7 +73,7 @@ static void *monitor_loop(void *data)
     if ((g_redis_monitor_last_reply = redisCommand(g_redis_monitor, "BLPOP %s %i", g_redis_commands_key, REDIS_QUEUE_TIMEOUT))) {
       if (g_redis_monitor_last_reply->type != REDIS_REPLY_ARRAY || g_redis_monitor_last_reply->elements != 2) {
         fprintf(stderr, "Invalid response from Redis.\n");
-        return 4;
+        exit(4);
       }
 
       const char *command = g_redis_monitor_last_reply->element[1]->str;
@@ -92,7 +92,7 @@ static void *monitor_loop(void *data)
       if (REDIS_ERR_EOF == g_redis_monitor->err) {
         g_redis_monitor = redis_connect();
       } else {
-        return 1;
+        exit(1);
       }
     }
   }
