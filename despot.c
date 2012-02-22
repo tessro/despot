@@ -15,6 +15,9 @@
 // Wait forever
 #define REDIS_QUEUE_TIMEOUT 0
 
+// Size of the Spotify URL buffer
+#define MAX_URL_LENGTH 510
+
 extern const uint8_t g_appkey[];
 
 /// The output queue for audio data
@@ -38,8 +41,9 @@ static sp_track   *g_loading_track;
 
 static redisContext *g_redis;
 static redisReply   *g_redis_last_reply;
-static char         *g_redis_queue_key    = "despot:queue";
-static char         *g_redis_commands_key = "despot:commands";
+static char         *g_redis_now_playing_key = "despot:now_playing";
+static char         *g_redis_queue_key       = "despot:queue";
+static char         *g_redis_commands_key    = "despot:commands";
 static const char   *g_host_ip   = "127.0.0.1";
 static int           g_host_port = 6379;
 
@@ -116,6 +120,12 @@ static void play_track(sp_track *track)
 
   sp_artist *artist = sp_track_artist(track, 0);
   printf("Now playing: %s - %s\n", sp_artist_name(artist), sp_track_name(track));
+
+  char buf[MAX_URL_LENGTH+1];
+  sp_link *link = sp_link_create_from_track(track, 0);
+  sp_link_as_string(link, buf, MAX_URL_LENGTH);
+  redisCommand(g_redis, "SET %s %s", g_redis_now_playing_key, buf);
+  sp_link_release(link);
 
   sp_session_player_load(g_sess, track);
   sp_session_player_play(g_sess, 1);
