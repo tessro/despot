@@ -44,6 +44,8 @@
 
 #define NUM_BUFFERS 3
 
+static ALuint source;
+
 static void error_exit(const char *msg)
 {
   puts(msg);
@@ -72,7 +74,6 @@ static void* audio_start(void *aux)
   ALCdevice *device = NULL;
   ALCcontext *context = NULL;
   ALuint buffers[NUM_BUFFERS];
-  ALuint source;
   ALint processed;
   ALenum error;
   ALint rate;
@@ -148,6 +149,11 @@ static void* audio_start(void *aux)
     queue_buffer(source, af, buffers[2]);
     frame = 0;
   }
+}
+
+void set_volume(const ALfloat volume)
+{
+  alSourcef(source, AL_GAIN, volume);
 }
 
 void audio_init(audio_fifo_t *af)

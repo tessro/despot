@@ -51,7 +51,8 @@ static int g_should_monitor = 1; // Monitor thread termination signal
 static redisContext *g_redis_monitor;
 static redisReply   *g_redis_monitor_last_reply;
 
-static int g_skip_count; // Songs to skip
+static int g_skip_count;      // Songs to skip
+static int g_new_volume = -1; // Volume to change to
 
 static redisContext* redis_connect(void)
 {
@@ -85,6 +86,14 @@ static void *monitor_loop(void *data)
       if (!strcasecmp(command, "NEXT")) {
         pthread_mutex_lock(&g_notify_mutex);
         g_skip_count++;
+        pthread_cond_signal(&g_notify_cond);
+        pthread_mutex_unlock(&g_notify_mutex);
+      }
+
+      int vol = 100;
+      if (sscanf(command, "VOLUME %i", &vol) == 1 && vol >= 0 && vol <= 100) {
+        pthread_mutex_lock(&g_notify_mutex);
+        g_new_volume = vol;
         pthread_cond_signal(&g_notify_cond);
         pthread_mutex_unlock(&g_notify_mutex);
       }
@@ -432,6 +441,13 @@ int main(int argc, char **argv)
 
       pthread_mutex_lock(&g_notify_mutex);
       g_skip_count--;
+      pthread_mutex_unlock(&g_notify_mutex);
+    }
+
+    if (g_new_volume != -1) {
+      pthread_mutex_lock(&g_notify_mutex);
+      set_volume(g_new_volume / 100.f);
+      g_new_volume = -1;
       pthread_mutex_unlock(&g_notify_mutex);
     }
 

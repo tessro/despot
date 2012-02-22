@@ -51,6 +51,7 @@ typedef struct audio_fifo {
 
 /* --- Functions --- */
 extern void audio_init(audio_fifo_t *af);
+extern void set_volume(const float volume);
 extern void audio_fifo_flush(audio_fifo_t *af);
 audio_fifo_data_t* audio_get(audio_fifo_t *af);
 
