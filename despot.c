@@ -48,6 +48,7 @@ typedef struct ds_keys {
   char *now_playing;
   char *queue;
   char *commands;
+  char *events;
   char *volume;
 } ds_keys_t;
 
@@ -55,6 +56,7 @@ static ds_keys_t g_keys = {
   .now_playing = "despot:now_playing",
   .queue       = "despot:queue",
   .commands    = "despot:commands",
+  .events      = "despot:events",
   .volume      = "despot:volume"
 };
 
@@ -126,6 +128,26 @@ static void *monitor_loop(void *data)
   return 0;
 }
 
+static void publish(const char *msg)
+{
+  redisCommand(g_redis, "PUBLISH %s %s", g_keys.events, msg);
+}
+
+static void publish_track(sp_track *track)
+{
+  char buf[8 + MAX_URL_LENGTH+1] = "PLAYING ";
+  sp_link *link = sp_link_create_from_track(track, 0);
+  sp_link_as_string(link, buf + strlen(buf), MAX_URL_LENGTH);
+  publish(buf);
+}
+
+static void publish_volume(const int volume)
+{
+  char buf[8 + 3 + 1];
+  sprintf(buf, "VOLUME %i", volume);
+  publish(buf);
+}
+
 static void play_track(sp_track *track)
 {
   if (g_current_track) {
@@ -145,6 +167,7 @@ static void play_track(sp_track *track)
   sp_link *link = sp_link_create_from_track(track, 0);
   sp_link_as_string(link, buf, MAX_URL_LENGTH);
   redisCommand(g_redis, "SET %s %s", g_keys.now_playing, buf);
+  publish_track(track);
   sp_link_release(link);
 
   sp_session_player_load(g_sess, track);
@@ -458,6 +481,7 @@ int main(int argc, char **argv)
     if (g_new_volume != -1) {
       pthread_mutex_lock(&g_notify_mutex);
       set_volume(g_new_volume / 100.f);
+      publish_volume(g_new_volume);
       g_new_volume = -1;
       pthread_mutex_unlock(&g_notify_mutex);
     }
