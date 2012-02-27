@@ -41,11 +41,22 @@ static sp_track   *g_loading_track;
 
 static redisContext *g_redis;
 static redisReply   *g_redis_last_reply;
-static char         *g_redis_now_playing_key = "despot:now_playing";
-static char         *g_redis_queue_key       = "despot:queue";
-static char         *g_redis_commands_key    = "despot:commands";
 static const char   *g_host_ip   = "127.0.0.1";
 static int           g_host_port = 6379;
+
+typedef struct ds_keys {
+  char *now_playing;
+  char *queue;
+  char *commands;
+  char *volume;
+} ds_keys_t;
+
+static ds_keys_t g_keys = {
+  .now_playing = "despot:now_playing",
+  .queue       = "despot:queue",
+  .commands    = "despot:commands",
+  .volume      = "despot:volume"
+};
 
 static int g_should_monitor = 1; // Monitor thread termination signal
 static redisContext *g_redis_monitor;
@@ -75,7 +86,7 @@ static void *monitor_loop(void *data)
       freeReplyObject(g_redis_monitor_last_reply);
     }
 
-    if ((g_redis_monitor_last_reply = redisCommand(g_redis_monitor, "BLPOP %s %i", g_redis_commands_key, REDIS_QUEUE_TIMEOUT))) {
+    if ((g_redis_monitor_last_reply = redisCommand(g_redis_monitor, "BLPOP %s %i", g_keys.commands, REDIS_QUEUE_TIMEOUT))) {
       if (g_redis_monitor_last_reply->type != REDIS_REPLY_ARRAY || g_redis_monitor_last_reply->elements != 2) {
         fprintf(stderr, "Invalid response from Redis.\n");
         exit(4);
@@ -133,7 +144,7 @@ static void play_track(sp_track *track)
   char buf[MAX_URL_LENGTH+1];
   sp_link *link = sp_link_create_from_track(track, 0);
   sp_link_as_string(link, buf, MAX_URL_LENGTH);
-  redisCommand(g_redis, "SET %s %s", g_redis_now_playing_key, buf);
+  redisCommand(g_redis, "SET %s %s", g_keys.now_playing, buf);
   sp_link_release(link);
 
   sp_session_player_load(g_sess, track);
@@ -169,7 +180,7 @@ static void play_next_track(void)
     freeReplyObject(g_redis_last_reply);
   }
 
-  if ((g_redis_last_reply = redisCommand(g_redis, "BLPOP %s %i", g_redis_queue_key, REDIS_QUEUE_TIMEOUT))) {
+  if ((g_redis_last_reply = redisCommand(g_redis, "BLPOP %s %i", g_keys.queue, REDIS_QUEUE_TIMEOUT))) {
     if (g_redis_last_reply->type != REDIS_REPLY_ARRAY || g_redis_last_reply->elements != 2) {
       fprintf(stderr, "Invalid response from Redis.\n");
       exit(4);
